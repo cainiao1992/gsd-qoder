@@ -1,0 +1,34 @@
+{
+  "name": "gsd-qoder",
+  "version": "1.0.0",
+  "description": "Embeds GSD in Qoder (Alibaba @qoder-ai/qodercli) through the GSD Host-Integration Interface.",
+  "license": "Apache-2.0",
+  "author": "Xiangfang Chen <565499699@qq.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cainiao1992/gsd-qoder.git"
+  },
+  "bin": {
+    "gsd-qoder": "bin/gsd-qoder.cjs"
+  },
+  "scripts": {
+    "lint": "node --check bin/gsd-qoder.cjs && node --check src/eos.cjs && node --check src/projection.cjs",
+    "test": "node --test",
+    "prepack": "npm run lint && npm test"
+  },
+  "dependencies": {
+    "@opengsd/gsd-core": "^1.8.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "gsd": ">=1.8.0"
+  },
+  "keywords": [
+    "gsd",
+    "qoder",
+    "qodercli",
+    "alibaba",
+    "host-integration",
+    "eos"
+  ]
+}
