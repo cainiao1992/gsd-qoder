@@ -139,6 +139,64 @@ function writeManifest(root, entries) {
   atomicWrite(path.join(root, MANIFEST_NAME), JSON.stringify({ files: entries }, null, 2) + '\n');
 }
 
+// ── Settings.json helpers ───────────────────────────────────────────────────
+
+const SETTINGS_NAME = 'settings.json';
+
+/** Read and parse settings.json, or return {} if absent/unparseable. */
+function readSettings(root) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(root, SETTINGS_NAME), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Merge GSD hooks into settings, preserving existing user hooks.
+ * Deduplicates by command string within each event+matcher group.
+ */
+function mergeHooksIntoSettings(settings, gsdHooks) {
+  const hooks = settings.hooks || {};
+  for (const [event, groups] of Object.entries(gsdHooks)) {
+    if (!hooks[event]) hooks[event] = [];
+    for (const group of groups) {
+      const existing = hooks[event].find(
+        (g) => (g.matcher || '') === (group.matcher || '')
+      );
+      if (existing) {
+        const existingCmds = new Set((existing.hooks || []).map((h) => h.command));
+        for (const h of group.hooks) {
+          if (!existingCmds.has(h.command)) existing.hooks.push(h);
+        }
+      } else {
+        hooks[event].push(group);
+      }
+    }
+  }
+  settings.hooks = hooks;
+  return settings;
+}
+
+/** Remove hook entries whose commands reference the given root path. */
+function removeGsdHooksFromSettings(settings, root) {
+  const hooks = settings.hooks;
+  if (!hooks) return settings;
+  for (const event of Object.keys(hooks)) {
+    hooks[event] = (hooks[event] || [])
+      .map((group) => {
+        const remaining = (group.hooks || []).filter(
+          (h) => !(h.command || '').includes(root)
+        );
+        return remaining.length > 0 ? { ...group, hooks: remaining } : null;
+      })
+      .filter(Boolean);
+    if (hooks[event].length === 0) delete hooks[event];
+  }
+  if (Object.keys(hooks).length === 0) delete settings.hooks;
+  return settings;
+}
+
 // ── Commands ────────────────────────────────────────────────────────────────
 
 /** install — handshake, project, atomic-write, manifest. Refuses user-modified files without --force. */
@@ -149,7 +207,10 @@ async function cmdInstall({ root, force }) {
   const desc = descriptorOf(ctx);
   console.log(`${OK} Handshake: protocol v${desc.protocolVersion} (core: ${ctx.coreRoot})`);
 
-  const artifacts = projection.buildProjectedArtifacts({ coreRoot: ctx.coreRoot });
+  const artifacts = [
+    ...projection.buildProjectedArtifacts({ coreRoot: ctx.coreRoot }),
+    ...projection.buildHookArtifacts({ coreRoot: ctx.coreRoot }),
+  ];
   const prev = readManifest(root);
   const prevHash = prev ? new Map(prev.files.map((f) => [f.path, f.sha256])) : new Map();
 
@@ -179,18 +240,23 @@ async function cmdInstall({ root, force }) {
 
   const agentCount = artifacts.filter((a) => a.relativePath.startsWith('agents/')).length;
   const skillCount = artifacts.filter((a) => a.relativePath.startsWith('skills/')).length;
+  const hookCount = artifacts.filter((a) => a.relativePath.startsWith('hooks/')).length;
   if (agentCount) console.log(`${OK} Projected ${agentCount} agent${agentCount === 1 ? '' : 's'}`);
   if (skillCount) console.log(`${OK} Projected ${skillCount} skill${skillCount === 1 ? '' : 's'}`);
+  if (hookCount) console.log(`${OK} Projected ${hookCount} hook script${hookCount === 1 ? '' : 's'}`);
 
   writeManifest(root, entries);
   console.log(`${OK} Manifest written (${entries.length} file${entries.length === 1 ? '' : 's'})`);
 
-  // TODO(hooks): wire ~/.qoder/settings.json hooks block here. Full set is 8
-  // events — PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStart,
-  // SubagentStop, PreCompact, FileChanged — but settings.json merging
-  // (preserve user hooks, dedupe ours) is deferred. First version projects
-  // agents + skills only.
-  console.log(`${WARN} Hooks/settings.json wiring not yet implemented (agents+skills only)`);
+  // Wire hooks into settings.json (preserve user hooks, dedupe ours)
+  const gsdHooks = projection.buildHooksConfig({ coreRoot: ctx.coreRoot, targetRoot: root });
+  if (Object.keys(gsdHooks).length > 0) {
+    const settings = mergeHooksIntoSettings(readSettings(root), gsdHooks);
+    atomicWrite(path.join(root, SETTINGS_NAME), JSON.stringify(settings, null, 2) + '\n');
+    const eventCount = Object.keys(gsdHooks).length;
+    console.log(`${OK} Wired ${eventCount} hook event${eventCount === 1 ? '' : 's'} into ${SETTINGS_NAME}`);
+  }
+
   console.log(`${OK} Done.`);
   return 0;
 }
@@ -218,6 +284,15 @@ function cmdUninstall({ root }) {
     if (err.code !== 'ENOENT') throw err;
   }
   console.log(`${OK} Removed ${removed} file${removed === 1 ? '' : 's'} + manifest.`);
+
+  // Clean GSD hooks from settings.json
+  const settingsPath = path.join(root, SETTINGS_NAME);
+  if (fs.existsSync(settingsPath)) {
+    const cleaned = removeGsdHooksFromSettings(readSettings(root), root);
+    atomicWrite(settingsPath, JSON.stringify(cleaned, null, 2) + '\n');
+    console.log(`${OK} Cleaned hooks from ${SETTINGS_NAME}`);
+  }
+
   return 0;
 }
 

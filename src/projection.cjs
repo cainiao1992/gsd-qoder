@@ -110,6 +110,73 @@ function buildProjectedArtifacts({ coreRoot }) {
   return artifacts;
 }
 
+// ── Hook projection ────────────────────────────────────────────────────────
+
+/**
+ * Hook scripts that are self-contained (Node built-ins only). Excludes
+ * gsd-check-update.js / gsd-check-update-worker.js which require() internal
+ * gsd-core modules via relative paths that break outside the package tree.
+ */
+const HOOK_FILES = [
+  'gsd-config-reload.js',
+  'gsd-context-monitor.js',
+  'gsd-ensure-canonical-path.js',
+  'gsd-prompt-guard.js',
+  'gsd-read-guard.js',
+  'gsd-read-injection-scanner.js',
+  'gsd-worktree-path-guard.js',
+];
+
+/** Commands referencing hooks we cannot ship (external deps). */
+const EXCLUDED_HOOK_COMMANDS = /gsd-check-update/;
+
+/**
+ * Return hook script files as { relativePath, content } artifacts.
+ * Only includes self-contained hooks (see HOOK_FILES).
+ */
+function buildHookArtifacts({ coreRoot }) {
+  const hooksDir = path.join(coreRoot, 'hooks');
+  const artifacts = [];
+  for (const file of HOOK_FILES) {
+    const filePath = path.join(hooksDir, file);
+    if (!fs.existsSync(filePath)) continue;
+    artifacts.push({
+      relativePath: `hooks/${file}`,
+      content: fs.readFileSync(filePath, 'utf8'),
+    });
+  }
+  return artifacts;
+}
+
+/**
+ * Build the hooks config object for settings.json.
+ * Reads gsd-core's hooks.json, removes entries with unresolvable deps,
+ * and replaces ${CLAUDE_PLUGIN_ROOT} with the actual target root path.
+ * @returns {object} e.g. { PreToolUse: [...], PostToolUse: [...], ... }
+ */
+function buildHooksConfig({ coreRoot, targetRoot }) {
+  const hooksJsonPath = path.join(coreRoot, 'hooks', 'hooks.json');
+  if (!fs.existsSync(hooksJsonPath)) return {};
+  const raw = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf8'));
+  const sourceHooks = raw.hooks || {};
+  const config = {};
+
+  for (const [event, groups] of Object.entries(sourceHooks)) {
+    const filtered = [];
+    for (const group of groups) {
+      const hooks = (group.hooks || []).filter(
+        (h) => !EXCLUDED_HOOK_COMMANDS.test(h.command || '')
+      );
+      if (hooks.length === 0) continue;
+      const entry = { hooks: hooks.map((h) => ({ ...h, command: h.command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, targetRoot) })) };
+      if (group.matcher) entry.matcher = group.matcher;
+      filtered.push(entry);
+    }
+    if (filtered.length > 0) config[event] = filtered;
+  }
+  return config;
+}
+
 module.exports = Object.freeze({
   convertClaudeToQoderMarkdown,
   splitFrontmatter,
@@ -117,4 +184,7 @@ module.exports = Object.freeze({
   projectAgent,
   projectSkill,
   buildProjectedArtifacts,
+  buildHookArtifacts,
+  buildHooksConfig,
+  HOOK_FILES,
 });
