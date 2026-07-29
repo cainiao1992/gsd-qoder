@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
+const readline = require('node:readline/promises');
 
 const eos = require('../src/eos.cjs'); // initialize, resolveCoreRoot
 const projection = require('../src/projection.cjs'); // buildProjectedArtifacts
@@ -36,6 +37,40 @@ const FAIL = `${C.red}✗${C.reset}`;
 
 const MANIFEST_NAME = '.gsd-qoder-manifest.json';
 
+// ── Edition selection ──────────────────────────────────────────────────────
+
+const EDITIONS = [
+  { label: 'Qoder International (qoder.com)', dir: '.qoder' },
+  { label: 'Qoder China (qoder.cn)',          dir: '.qoder-cn' },
+];
+
+/**
+ * Prompt the user to choose a Qoder edition (International / China).
+ * Returns the resolved config directory path. Falls back to the
+ * International edition (~/.qoder) after 3 invalid attempts.
+ * Only called when stdin is a TTY and no --root / QODER_CONFIG_DIR was given.
+ */
+async function promptEdition() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const home = os.homedir();
+  console.log('');
+  console.log(`  ${C.cyan}Select your Qoder edition:${C.reset}`);
+  EDITIONS.forEach((ed, i) => {
+    const num = `${C.cyan}${i + 1}${C.reset}`;
+    console.log(`    ${num}) ${ed.label.padEnd(36)} → ~/${ed.dir}`);
+  });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const answer = (await rl.question(`\n  ${C.cyan}Enter choice [1]:${C.reset} `)).trim();
+    const idx = answer === '' ? 0 : parseInt(answer, 10) - 1;
+    rl.close();
+    if (idx >= 0 && idx < EDITIONS.length) {
+      return path.join(home, EDITIONS[idx].dir);
+    }
+    console.log(`${WARN} Invalid choice. Please enter 1 or 2.`);
+  }
+  return path.join(home, EDITIONS[0].dir);
+}
+
 // ── Argument parsing ────────────────────────────────────────────────────────
 
 /** Parse argv into { command, root, force }. Unknown flags ignored. */
@@ -53,10 +88,23 @@ function parseArgs(argv) {
   return { command, root, force };
 }
 
-/** Resolve target dir: --root > QODER_CONFIG_DIR > ~/.qoder (~ expanded). */
-function resolveRoot(rootFlag) {
-  const from = rootFlag || process.env.QODER_CONFIG_DIR || path.join(os.homedir(), '.qoder');
-  return path.resolve(from.replace(/^~/, os.homedir()));
+/**
+ * Resolve the target config directory.
+ * Priority: --root flag > QODER_CONFIG_DIR env > interactive prompt (TTY only)
+ *           > ~/.qoder (non-TTY default — International edition).
+ * @param {string|null} rootFlag  - explicit --root value
+ * @param {boolean} interactive   - when true and no flag/env given, prompt
+ * @returns {Promise<string>} resolved absolute path
+ */
+async function resolveRoot(rootFlag, interactive = false) {
+  if (rootFlag) return path.resolve(rootFlag.replace(/^~/, os.homedir()));
+  if (process.env.QODER_CONFIG_DIR) {
+    return path.resolve(process.env.QODER_CONFIG_DIR.replace(/^~/, os.homedir()));
+  }
+  if (interactive && process.stdin.isTTY) {
+    return promptEdition();
+  }
+  return path.join(os.homedir(), '.qoder');
 }
 
 // ── Crypto + IO helpers ─────────────────────────────────────────────────────
@@ -222,19 +270,24 @@ Usage:
   gsd-qoder doctor
 
 Options:
-  --root <dir>   Qoder config dir (default ~/.qoder, or $QODER_CONFIG_DIR).
+  --root <dir>   Qoder config dir. Skips the edition prompt.
   --force        Overwrite files modified since the last install.
 
+Editions (when no --root or QODER_CONFIG_DIR is given, and stdin is a TTY):
+  1) Qoder International (qoder.com)   → ~/.qoder
+  2) Qoder China (qoder.cn)            → ~/.qoder-cn
+  Non-interactive (CI/pipes) defaults to ~/.qoder.
+
 Environment:
-  QODER_CONFIG_DIR   Overrides the default config dir (e.g. ~/.qoder-cn).`);
+  QODER_CONFIG_DIR   Overrides the config dir (skips the edition prompt).`);
 }
 
 /** Entry point: parse argv, dispatch, exit with the command's code. */
 async function main() {
   const { command, root, force } = parseArgs(process.argv.slice(2));
   switch (command) {
-    case 'install': return cmdInstall({ root: resolveRoot(root), force });
-    case 'uninstall': return cmdUninstall({ root: resolveRoot(root) });
+    case 'install': return cmdInstall({ root: await resolveRoot(root, true), force });
+    case 'uninstall': return cmdUninstall({ root: await resolveRoot(root, true) });
     case 'descriptor': return cmdDescriptor();
     case 'doctor': return cmdDoctor();
     default:

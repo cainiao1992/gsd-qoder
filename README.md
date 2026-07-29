@@ -7,15 +7,34 @@
 ## Install
 
 ```bash
-npm install --global github:cainiao1992/gsd-qoder#v1.0.0
+npm install --global github:cainiao1992/gsd-qoder
 gsd-qoder install
 ```
 
-By default, files are projected into `~/.qoder/`. Override the target directory with `QODER_CONFIG_DIR` — for example, to install into a Qoder-CN layout:
+Running `gsd-qoder install` interactively prompts you to choose a Qoder edition:
+
+```
+  Select your Qoder edition:
+    1) Qoder International (qoder.com)   → ~/.qoder
+    2) Qoder China (qoder.cn)            → ~/.qoder-cn
+
+  Enter choice [1]:
+```
+
+- **Qoder International** (qoder.com) installs to `~/.qoder`
+- **Qoder China** (qoder.cn) installs to `~/.qoder-cn`
+
+Both editions are the same product; the only difference is the config directory. To skip the prompt, pass `--root` or set `QODER_CONFIG_DIR`:
 
 ```bash
+# Explicit directory
+gsd-qoder install --root ~/.qoder-cn
+
+# Or via env var
 QODER_CONFIG_DIR=~/.qoder-cn gsd-qoder install
 ```
+
+In non-interactive environments (CI, pipes), the International edition (`~/.qoder`) is used by default.
 
 To remove every file this package projected (tracked via the install manifest):
 
