@@ -111,4 +111,4 @@ Each of the 9 GSD host-integration axes, the negotiated value, and the Qoder doc
 
 ## License
 
-Apache-2.0, matching `@qoder-ai/qodercli`'s license.
+Apache-2.0
