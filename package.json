@@ -1,6 +1,6 @@
 {
   "name": "gsd-qoder",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Embeds GSD in Qoder (Alibaba @qoder-ai/qodercli) through the GSD Host-Integration Interface.",
   "license": "Apache-2.0",
   "author": "Xiangfang Chen <565499699@qq.com>",
