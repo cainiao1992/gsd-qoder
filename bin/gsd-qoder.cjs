@@ -139,6 +139,36 @@ function writeManifest(root, entries) {
   atomicWrite(path.join(root, MANIFEST_NAME), JSON.stringify({ files: entries }, null, 2) + '\n');
 }
 
+/**
+ * Remove directories left empty after deleting tracked files.
+ * Collects the ancestor dirs of every path (strictly under `root`), then
+ * rmdir's each bottom-up. Non-empty dirs (user files remain) are skipped.
+ */
+function pruneEmptyDirs(root, filePaths) {
+  const candidates = new Set();
+  const rootPrefix = root + path.sep;
+  for (const file of filePaths) {
+    let dir = path.dirname(file);
+    while (dir !== root && dir.startsWith(rootPrefix)) {
+      candidates.add(dir);
+      const parent = path.dirname(dir);
+      if (parent === dir) break; // fs root guard
+      dir = parent;
+    }
+  }
+  const sorted = [...candidates].sort((a, b) => b.length - a.length);
+  let pruned = 0;
+  for (const dir of sorted) {
+    try {
+      fs.rmdirSync(dir);
+      pruned++;
+    } catch (err) {
+      if (err.code !== 'ENOTEMPTY' && err.code !== 'ENOENT') throw err;
+    }
+  }
+  return pruned;
+}
+
 // ── Settings.json helpers ───────────────────────────────────────────────────
 
 const SETTINGS_NAME = 'settings.json';
@@ -285,6 +315,11 @@ function cmdUninstall({ root }) {
   }
   console.log(`${OK} Removed ${removed} file${removed === 1 ? '' : 's'} + manifest.`);
 
+  const pruned = pruneEmptyDirs(root, manifest.files.map((f) => f.path));
+  if (pruned > 0) {
+    console.log(`${OK} Pruned ${pruned} empty director${pruned === 1 ? 'y' : 'ies'}.`);
+  }
+
   // Clean GSD hooks from settings.json
   const settingsPath = path.join(root, SETTINGS_NAME);
   if (fs.existsSync(settingsPath)) {
@@ -381,5 +416,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  parseArgs, resolveRoot, sha256, atomicWrite, readManifest, writeManifest, main,
+  parseArgs, resolveRoot, sha256, atomicWrite, readManifest, writeManifest,
+  pruneEmptyDirs, main,
 };
