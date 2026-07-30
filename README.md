@@ -2,7 +2,7 @@
 
 ![Release](https://img.shields.io/github/v/release/cainiao1992/gsd-qoder)
 
-`gsd-qoder` is an Embeddable Orchestration System (EoS) that projects [GSD](https://github.com/open-gsd/gsd-core) — the spec-driven development system — into Qoder CLI (Alibaba's `@qoder-ai/qodercli`). It is registered in the GSD EoS Registry and built against the GSD Host-Integration Interface. Running `gsd-qoder install` takes GSD's source agents and skills and projects them into `~/.qoder/` (or `QODER_CONFIG_DIR`), making GSD's spec-driven workflows — spec authoring, planning, task decomposition, code review — directly available inside Qoder CLI.
+`gsd-qoder` is an Embeddable Orchestration System (EoS) that projects [GSD](https://github.com/open-gsd/gsd-core) — the spec-driven development system — into [Qoder](https://qoder.com) (Alibaba's AI coding product family, spanning Qoder CLI and Qoder Desktop). It is registered in the GSD EoS Registry and built against the GSD Host-Integration Interface. Running `gsd-qoder install` takes GSD's source agents and skills and projects them into the Qoder config directory (`~/.qoder/` or `QODER_CONFIG_DIR`), which is shared by both the CLI and Desktop clients of the same region — so GSD's spec-driven workflows (spec authoring, planning, task decomposition, code review) are available everywhere you use Qoder.
 
 ## Quick start (no install)
 
@@ -36,8 +36,8 @@ Running `gsd-qoder install` interactively prompts you to choose a Qoder edition:
   Enter choice [1]:
 ```
 
-- **Qoder International** (qoder.com) installs to `~/.qoder`
-- **Qoder China** (qoder.cn) installs to `~/.qoder-cn`
+- **Qoder International** (qoder.com) installs to `~/.qoder` — shared by Qoder CLI and Qoder Desktop
+- **Qoder China** (qoder.cn) installs to `~/.qoder-cn` — shared by Qoder CLI CN and Qoder Desktop CN
 
 Both editions are the same product; the only difference is the config directory. To skip the prompt, pass `--root` or set `QODER_CONFIG_DIR`:
 

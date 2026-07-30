@@ -4,7 +4,7 @@ Guidance for any AI coding agent working in this repo. Read this before editing.
 
 ## What this is
 
-`gsd-qoder` is a GSD **Embeddable Orchestration System (EoS)** package. It is *not* an application — it is a thin CLI that projects GSD's source agents + skills (from the `@opengsd/gsd-core` npm dependency) into a Qoder CLI config directory (`~/.qoder` or `~/.qoder-cn`), after applying Claude → Qoder conversions. It is registered in the GSD EoS Registry and built against the GSD Host-Integration Interface.
+`gsd-qoder` is a GSD **Embeddable Orchestration System (EoS)** package. It is *not* an application — it is a thin CLI that projects GSD's source agents + skills (from the `@opengsd/gsd-core` npm dependency) into a Qoder config directory (`~/.qoder` or `~/.qoder-cn`), which is shared by both the Qoder CLI and Qoder Desktop clients of the same region. Claude → Qoder conversions are applied along the way. It is registered in the GSD EoS Registry and built against the GSD Host-Integration Interface.
 
 Three source files, all CommonJS (`.cjs`), zero runtime dependencies, Node 18+.
 

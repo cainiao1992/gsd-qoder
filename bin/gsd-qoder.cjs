@@ -371,7 +371,7 @@ function cmdDoctor() {
 // ── Usage + dispatch ────────────────────────────────────────────────────────
 
 function printUsage() {
-  console.log(`gsd-qoder — GSD integration for the Qoder CLI.
+  console.log(`gsd-qoder — GSD integration for Qoder CLI & Desktop.
 
 Usage:
   gsd-qoder install [--root <dir>] [--force]
