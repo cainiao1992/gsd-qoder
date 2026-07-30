@@ -4,6 +4,21 @@
 
 `gsd-qoder` is an Embeddable Orchestration System (EoS) that projects [GSD](https://github.com/open-gsd/gsd-core) — the spec-driven development system — into Qoder CLI (Alibaba's `@qoder-ai/qodercli`). It is registered in the GSD EoS Registry and built against the GSD Host-Integration Interface. Running `gsd-qoder install` takes GSD's source agents and skills and projects them into `~/.qoder/` (or `QODER_CONFIG_DIR`), making GSD's spec-driven workflows — spec authoring, planning, task decomposition, code review — directly available inside Qoder CLI.
 
+## Quick start (no install)
+
+Run directly via `npx` without a global install:
+
+```bash
+npx -y github:cainiao1992/gsd-qoder install
+```
+
+This fetches the package on-the-fly, runs the interactive edition prompt, and projects GSD into your Qoder config directory. All commands work the same way:
+
+```bash
+npx -y github:cainiao1992/gsd-qoder uninstall
+npx -y github:cainiao1992/gsd-qoder doctor
+```
+
 ## Install
 
 ```bash
@@ -83,16 +98,16 @@ Each of the 9 GSD host-integration axes, the negotiated value, and the Qoder doc
 
 ## Known limitations
 
-- **Hooks/settings.json wiring is deferred** — this first release projects agents + skills only. The 8-event settings.json hooks block (PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStart, SubagentStop, PreCompact, FileChanged) will follow once the settings-merge logic is implemented.
 - **dispatch.isolation: none** — Qoder documents a real worktree capability (`isolation: worktree` frontmatter), but it's a declaration-time, per-agent-definition property, not a dispatch-time parameter. GSD's two negotiation models (harness-worktree, orchestrator-worktree) both assume a per-dispatch injection point Qoder doesn't expose. Activating worktree isolation needs the converter to inject `isolation: worktree` into the executor agent's frontmatter — tracked as a follow-up.
 
 ## How it works
 
 1. Depends on `@opengsd/gsd-core` (installed automatically as a regular npm dependency).
-2. Reads GSD's source agents/skills from the gsd-core package.
+2. Reads GSD's source agents, skills, and hooks from the gsd-core package.
 3. Applies Qoder-specific conversions (path rewrites, frontmatter sanitization, branding).
-4. Writes projected files to `~/.qoder/agents/` and `~/.qoder/skills/`.
-5. Tracks installed files in `.gsd-qoder-manifest.json` for clean uninstall.
+4. Writes projected files to `~/.qoder/agents/`, `~/.qoder/skills/`, and `~/.qoder/hooks/`.
+5. Merges GSD hook events into `settings.json` (preserves existing user hooks, deduplicates).
+6. Tracks installed files in `.gsd-qoder-manifest.json` for clean uninstall.
 
 ## License
 
