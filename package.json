@@ -1,6 +1,6 @@
 {
   "name": "gsd-qoder",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Embeds GSD in Qoder CLI & Desktop (Alibaba) through the GSD Host-Integration Interface.",
   "license": "Apache-2.0",
   "author": "Xiangfang Chen <565499699@qq.com>",
@@ -17,11 +17,11 @@
     "prepack": "npm run lint && npm test"
   },
   "dependencies": {
-    "@opengsd/gsd-core": "1.9.0"
+    "@opengsd/gsd-core": "1.9.1"
   },
   "engines": {
     "node": ">=18.0.0",
-    "gsd": "1.9.0"
+    "gsd": "1.9.1"
   },
   "keywords": [
     "gsd",
