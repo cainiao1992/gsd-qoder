@@ -66,7 +66,7 @@ function extractField(fmRaw, fieldName) {
 function projectAgent(content) {
   const { fmRaw, body } = splitFrontmatter(content);
   const name = extractField(fmRaw, 'name');
-  const description = extractField(fmRaw, 'description');
+  const description = convertClaudeToQoderMarkdown(extractField(fmRaw, 'description'));
   const sanitizedFm = `---\nname: ${name}\ndescription: ${description}\n---`;
   const convertedBody = convertClaudeToQoderMarkdown(body.replace(/^\r?\n+/, ''));
   return { relativePath: `agents/${name}.md`, content: `${sanitizedFm}\n\n${convertedBody}` };
