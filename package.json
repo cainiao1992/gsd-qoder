@@ -12,7 +12,7 @@
     "gsd-qoder": "bin/gsd-qoder.cjs"
   },
   "scripts": {
-    "lint": "node --check bin/gsd-qoder.cjs && node --check src/eos.cjs && node --check src/projection.cjs",
+    "lint": "node --check bin/gsd-qoder.cjs && node --check src/eos.cjs && node --check src/projection.cjs && node --check src/plugin.cjs",
     "test": "node --test",
     "prepack": "npm run lint && npm test"
   },

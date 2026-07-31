@@ -57,6 +57,20 @@ To remove every file this package projected (tracked via the install manifest):
 gsd-qoder uninstall
 ```
 
+## Plugin mode
+
+As an alternative to the traditional file-projection install, `gsd-qoder` can package GSD as a [Qoder Plugin](https://docs.qoder.com/extensions/plugins.md) and install it through the standard plugin lifecycle (`qodercli plugins install`). Plugins are self-contained directories managed by the Qoder CLI — no manifest tracking or settings.json merging needed.
+
+```bash
+# Generate + install as a user-level plugin
+gsd-qoder install --plugin
+
+# Uninstall the plugin
+gsd-qoder uninstall --plugin
+```
+
+Plugin mode requires `qodercli` (or `qoderclicn` for the China edition) on PATH. The plugin is always installed at `user` scope (globally available across all projects).
+
 ## Commands
 
 | Command | Description |
@@ -93,6 +107,10 @@ Each of the 9 GSD host-integration axes, the negotiated value, and the Qoder doc
 - https://docs.qoder.com/en/cli/hooks
 - https://docs.qoder.com/en/cli/subagent
 - https://docs.qoder.com/en/cli/mcp-servers
+- https://docs.qoder.com/extensions/plugins.md
+- https://docs.qoder.com/cli/plugins.md
+- https://docs.qoder.cn/cli/plugins.md
+- https://github.com/open-gsd/gsd-core/blob/next/docs/registries/README.md
 - https://www.npmjs.com/package/@qoder-ai/qodercli
 - https://docs.qoder.com/en/cli/sdk/references
 

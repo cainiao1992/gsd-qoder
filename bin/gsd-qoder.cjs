@@ -15,8 +15,11 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const readline = require('node:readline/promises');
 
+const { execFileSync } = require('node:child_process');
+
 const eos = require('../src/eos.cjs'); // initialize, resolveCoreRoot
 const projection = require('../src/projection.cjs'); // buildProjectedArtifacts
+const plugin = require('../src/plugin.cjs'); // buildPluginArtifacts
 
 /** Build the descriptor object from the EoS context. */
 function descriptorOf(ctx) {
@@ -73,19 +76,21 @@ async function promptEdition() {
 
 // ── Argument parsing ────────────────────────────────────────────────────────
 
-/** Parse argv into { command, root, force }. Unknown flags ignored. */
+/** Parse argv into { command, root, force, plugin }. Unknown flags ignored. */
 function parseArgs(argv) {
   let command = null;
   let root = null;
   let force = false;
+  let plugin = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--root' || a === '-r') root = argv[++i] || null;
     else if (a.startsWith('--root=')) root = a.slice('--root='.length);
     else if (a === '--force') force = true;
+    else if (a === '--plugin') plugin = true;
     else if (!a.startsWith('-') && command === null) command = a;
   }
-  return { command, root, force };
+  return { command, root, force, plugin };
 }
 
 /**
@@ -105,6 +110,39 @@ async function resolveRoot(rootFlag, interactive = false) {
     return promptEdition();
   }
   return path.join(os.homedir(), '.qoder');
+}
+
+/**
+ * Resolve the integration mode.
+ * Priority: --plugin flag > interactive prompt (TTY) > 'traditional' (non-TTY default).
+ */
+async function resolveMode(pluginFlag) {
+  if (pluginFlag) return 'plugin';
+  if (process.stdin.isTTY) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    console.log('');
+    console.log(`  ${C.cyan}Select integration mode:${C.reset}`);
+    console.log(`    ${C.cyan}1${C.reset}) traditional  — write files into Qoder config dir (default)`);
+    console.log(`    ${C.cyan}2${C.reset}) plugin       — install as a Qoder Plugin`);
+    const answer = (await rl.question(`\n  ${C.cyan}Enter choice [1]:${C.reset} `)).trim();
+    rl.close();
+    if (answer === '2' || answer.toLowerCase() === 'plugin') return 'plugin';
+    return 'traditional';
+  }
+  return 'traditional';
+}
+
+/** Detect the Qoder CLI binary name from the resolved config root. */
+function resolvePluginBinary(root) {
+  const binary = root.includes('.qoder-cn') ? 'qoderclicn' : 'qodercli';
+  const locator = process.platform === 'win32' ? 'where' : 'which';
+  try {
+    execFileSync(locator, [binary], { stdio: 'ignore' });
+  } catch {
+    console.error(`${FAIL} "${binary}" not found on PATH. Install it first or omit --plugin.`);
+    process.exit(1);
+  }
+  return binary;
 }
 
 // ── Crypto + IO helpers ─────────────────────────────────────────────────────
@@ -331,6 +369,45 @@ function cmdUninstall({ root }) {
   return 0;
 }
 
+/** install --plugin — generate a Qoder Plugin and install it at user scope. */
+async function cmdInstallPlugin({ root }) {
+  console.log(`${C.cyan}gsd-qoder install --plugin${C.reset}`);
+
+  const binary = resolvePluginBinary(root);
+
+  const ctx = eos.initialize();
+  const desc = descriptorOf(ctx);
+  console.log(`${OK} Handshake: protocol v${desc.protocolVersion} (core: ${ctx.coreRoot})`);
+
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const artifacts = plugin.buildPluginArtifacts({ coreRoot: ctx.coreRoot, version: pkg.version });
+
+  const pluginDir = path.join(os.tmpdir(), `gsd-qoder-plugin-${process.pid}`);
+  for (const art of artifacts) {
+    atomicWrite(path.join(pluginDir, art.relativePath), art.content);
+  }
+
+  const agentCount = artifacts.filter((a) => a.relativePath.startsWith('agents/')).length;
+  const skillCount = artifacts.filter((a) => a.relativePath.startsWith('skills/')).length;
+  const hookCount = artifacts.filter((a) => a.relativePath.startsWith('hooks/')).length;
+  console.log(`${OK} Generated plugin: ${agentCount} agents, ${skillCount} skills, ${hookCount} hook files`);
+
+  execFileSync(binary, ['plugins', 'install', pluginDir, '--scope', 'user'], { stdio: 'inherit' });
+  console.log(`${OK} Plugin installed (scope: user)`);
+
+  fs.rmSync(pluginDir, { recursive: true, force: true });
+  return 0;
+}
+
+/** uninstall --plugin — delegate to qodercli plugins uninstall. */
+function cmdUninstallPlugin({ root }) {
+  console.log(`${C.cyan}gsd-qoder uninstall --plugin${C.reset}`);
+  const binary = resolvePluginBinary(root);
+  execFileSync(binary, ['plugins', 'uninstall', 'gsd-qoder', '--scope', 'user'], { stdio: 'inherit' });
+  console.log(`${OK} Plugin uninstalled.`);
+  return 0;
+}
+
 /** descriptor — print the EoS descriptor as JSON. */
 function cmdDescriptor() {
   const ctx = eos.initialize();
@@ -374,14 +451,15 @@ function printUsage() {
   console.log(`gsd-qoder — GSD integration for Qoder CLI & Desktop.
 
 Usage:
-  gsd-qoder install [--root <dir>] [--force]
-  gsd-qoder uninstall [--root <dir>]
+  gsd-qoder install [--plugin] [--root <dir>] [--force]
+  gsd-qoder uninstall [--plugin] [--root <dir>]
   gsd-qoder descriptor
   gsd-qoder doctor
 
 Options:
-  --root <dir>   Qoder config dir. Skips the edition prompt.
-  --force        Overwrite files modified since the last install.
+  --plugin         Install as a Qoder Plugin (user scope) instead of file projection.
+  --root <dir>     Qoder config dir. Skips the edition prompt.
+  --force          Overwrite files modified since the last install (traditional only).
 
 Editions (when no --root or QODER_CONFIG_DIR is given, and stdin is a TTY):
   1) Qoder International (qoder.com)   → ~/.qoder
@@ -394,10 +472,20 @@ Environment:
 
 /** Entry point: parse argv, dispatch, exit with the command's code. */
 async function main() {
-  const { command, root, force } = parseArgs(process.argv.slice(2));
+  const { command, root, force, plugin } = parseArgs(process.argv.slice(2));
   switch (command) {
-    case 'install': return cmdInstall({ root: await resolveRoot(root, true), force });
-    case 'uninstall': return cmdUninstall({ root: await resolveRoot(root, true) });
+    case 'install': {
+      const resolvedMode = await resolveMode(plugin);
+      const resolvedRoot = await resolveRoot(root, true);
+      if (resolvedMode === 'plugin') return cmdInstallPlugin({ root: resolvedRoot });
+      return cmdInstall({ root: resolvedRoot, force });
+    }
+    case 'uninstall': {
+      const resolvedMode = await resolveMode(plugin);
+      const resolvedRoot = await resolveRoot(root, true);
+      if (resolvedMode === 'plugin') return cmdUninstallPlugin({ root: resolvedRoot });
+      return cmdUninstall({ root: resolvedRoot });
+    }
     case 'descriptor': return cmdDescriptor();
     case 'doctor': return cmdDoctor();
     default:
@@ -416,6 +504,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  parseArgs, resolveRoot, sha256, atomicWrite, readManifest, writeManifest,
+  parseArgs, resolveRoot, resolveMode, resolvePluginBinary,
+  sha256, atomicWrite, readManifest, writeManifest,
   pruneEmptyDirs, main,
 };
