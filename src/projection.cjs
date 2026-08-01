@@ -33,8 +33,11 @@ function convertClaudeToQoderMarkdown(content) {
   converted = converted.replace(/\.\/\.claude(?![\w-])/g, './.qoder');
   converted = converted.replace(/~\/\.claude(?![\w-])/g, '~/.qoder');
   converted = converted.replace(/\$HOME\/\.claude(?![\w-])/g, '$HOME/.qoder');
+  // Quoted string literal form (JS hook scripts: path.join(homeDir, '.claude'))
+  converted = converted.replace(/'\.claude'/g, "'.qoder'");
   // Env var name rewrite
   converted = converted.replace(/\bCLAUDE_CONFIG_DIR\b/g, 'QODER_CONFIG_DIR');
+  converted = converted.replace(/\bCLAUDE_PLUGIN_ROOT\b/g, 'QODER_PLUGIN_ROOT');
   // CLAUDE.md → AGENTS.md
   converted = converted.replace(/`\.\/CLAUDE\.md`/g, '`AGENTS.md`');
   converted = converted.replace(/\.\/CLAUDE\.md/g, 'AGENTS.md');
@@ -142,7 +145,7 @@ function buildHookArtifacts({ coreRoot }) {
     if (!fs.existsSync(filePath)) continue;
     artifacts.push({
       relativePath: `hooks/${file}`,
-      content: fs.readFileSync(filePath, 'utf8'),
+      content: convertClaudeToQoderMarkdown(fs.readFileSync(filePath, 'utf8')),
     });
   }
   return artifacts;

@@ -392,6 +392,11 @@ async function cmdInstallPlugin({ root }) {
   const hookCount = artifacts.filter((a) => a.relativePath.startsWith('hooks/')).length;
   console.log(`${OK} Generated plugin: ${agentCount} agents, ${skillCount} skills, ${hookCount} hook files`);
 
+  try {
+    execFileSync(binary, ['plugins', 'uninstall', 'gsd-qoder', '--scope', 'user'], { stdio: 'ignore' });
+  } catch (_) { /* not previously installed */ }
+  prunePluginCache(root);
+
   execFileSync(binary, ['plugins', 'install', pluginDir, '--scope', 'user'], { stdio: 'inherit' });
   console.log(`${OK} Plugin installed (scope: user)`);
 
@@ -399,11 +404,18 @@ async function cmdInstallPlugin({ root }) {
   return 0;
 }
 
+/** Remove the gsd-qoder plugin cache directory entirely. */
+function prunePluginCache(root) {
+  const cacheBase = path.join(root, 'plugins', 'cache', 'local', 'gsd-qoder');
+  fs.rmSync(cacheBase, { recursive: true, force: true });
+}
+
 /** uninstall --plugin — delegate to qodercli plugins uninstall. */
 function cmdUninstallPlugin({ root }) {
   console.log(`${C.cyan}gsd-qoder uninstall --plugin${C.reset}`);
   const binary = resolvePluginBinary(root);
   execFileSync(binary, ['plugins', 'uninstall', 'gsd-qoder', '--scope', 'user'], { stdio: 'inherit' });
+  prunePluginCache(root);
   console.log(`${OK} Plugin uninstalled.`);
   return 0;
 }
