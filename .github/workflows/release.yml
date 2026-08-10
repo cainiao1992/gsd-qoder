@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+          if [ -n "${PREV}" ]; then
+            NOTES="$(git log --oneline --no-merges "${PREV}..${TAG}" | sed 's/^/- /')"
+          else
+            NOTES="Initial release ${TAG}"
+          fi
+          if [ -z "${NOTES}" ]; then
+            NOTES="Release ${TAG}"
+          fi
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes "${NOTES}"
